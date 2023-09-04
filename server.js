@@ -62,7 +62,7 @@ io.on("connection", (socket) => {
   console.log(`user connected ${socket.id}`);
 
   socket.on("create-new-room", (data) => {
-    createNewRoomHandler({...data,roomId:1}, socket);
+    createNewRoomHandler({...data}, socket);
   });
 
   socket.on("join-room", (data) => {
