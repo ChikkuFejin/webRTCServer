@@ -16,9 +16,7 @@ let rooms = [];
 // create route to check if room exists
 app.get("/api/room-exists/:roomId", (req, res) => {
   const { roomId } = req.params;
-  const room = rooms.find((room) => room.id == roomId);
-  
-
+  const room = rooms.find((room) => room.id === roomId);
 
   if (room) {
     // send reponse that room exists
@@ -62,7 +60,7 @@ io.on("connection", (socket) => {
   console.log(`user connected ${socket.id}`);
 
   socket.on("create-new-room", (data) => {
-    createNewRoomHandler({...data}, socket);
+    createNewRoomHandler(data, socket);
   });
 
   socket.on("join-room", (data) => {
@@ -91,9 +89,9 @@ io.on("connection", (socket) => {
 const createNewRoomHandler = (data, socket) => {
   console.log("host is creating new room");
   console.log(data);
-  const { identity, onlyAudio,roomId } = data;
+  const { identity, onlyAudio } = data;
 
-  // const roomId = uuidv4();
+  const roomId = uuidv4();
 
   // create new user
   const newUser = {
@@ -137,7 +135,7 @@ const joinRoomHandler = (data, socket) => {
   };
 
   // join room as user which just is trying to join room passing room id
-  const room = rooms.find((room) => room.id == roomId);
+  const room = rooms.find((room) => room.id === roomId);
   room.connectedUsers = [...room.connectedUsers, newUser];
 
   // join socket.io room
