@@ -13,31 +13,31 @@ app.use(cors());
 let connectedUsers = [];
 let rooms = [];
 
-// create route to check if room exists
+
 app.get("/api/room-exists/:roomId", (req, res) => {
   const { roomId } = req.params;
   const room = rooms.find((room) => room.id === roomId);
 
   if (room) {
-    // send reponse that room exists
+   
     if (room.connectedUsers.length > 3) {
       return res.send({ roomExists: true, full: true });
     } else {
       return res.send({ roomExists: true, full: false });
     }
   } else {
-    // send response that room does not exists
+    
     return res.send({ roomExists: false });
   }
 });
 
 app.get("/api/get-turn-credentials", (req, res) => {
-  const accountSid = "AC7cff1792ce0f8d410f4790a5048eeeb7";
-  const authToken = "c9f5e65fe22c2e6764d5ca5530d4970c";
+  const accountSid = "AC2f5b06cac74c268ead9f2cfe6e615117";
+  const authToken = "0fff27c6810ac4bb3d63e6eabbad24b9";
 
   const client = twilio(accountSid, authToken);
 
-  res.send({ token: null });
+  // res.send({ token: null });
   try {
     client.tokens.create().then((token) => {
       res.send({ token });
@@ -84,16 +84,22 @@ io.on("connection", (socket) => {
   });
 });
 
-// socket.io handlers
 
-const createNewRoomHandler = (data, socket) => {
+
+const createNewRoomHandler = (data_, socket) => {
   console.log("host is creating new room");
-  console.log(data);
-  const { identity, onlyAudio } = data;
 
-  const roomId = uuidv4();
+ let data=data_
+  const { identity, onlyAudio,serviceId } = data;
+  const roomId = serviceId;
 
-  // create new user
+  if(isExtistRoom(roomId)){
+    data.roomId=roomId;
+    joinRoomHandler(data, socket);
+    return 
+  }
+
+
   const newUser = {
     identity,
     id: uuidv4(),
@@ -102,26 +108,29 @@ const createNewRoomHandler = (data, socket) => {
     onlyAudio,
   };
 
-  // push that user to connectedUsers
+ 
   connectedUsers = [...connectedUsers, newUser];
 
-  //create new room
+
   const newRoom = {
     id: roomId,
     connectedUsers: [newUser],
   };
-  // join socket.io room
+
   socket.join(roomId);
 
   rooms = [...rooms, newRoom];
 
-  // emit to that client which created that room roomId
   socket.emit("room-id", { roomId });
 
-  // emit an event to all users connected
-  // to that room about new users which are right in this room
+
   socket.emit("room-update", { connectedUsers: newRoom.connectedUsers });
 };
+
+const isExtistRoom=(serviceId)=>{
+  const room = rooms.find((room) => room.id === serviceId);
+  return room ?true:false
+}
 
 const joinRoomHandler = (data, socket) => {
   const { identity, roomId, onlyAudio } = data;
@@ -134,22 +143,24 @@ const joinRoomHandler = (data, socket) => {
     onlyAudio,
   };
 
-  // join room as user which just is trying to join room passing room id
-  const room = rooms.find((room) => room.id === roomId);
-  room.connectedUsers = [...room.connectedUsers, newUser];
 
-  // join socket.io room
+  const room = rooms.find((room) => room.id ==roomId);
+  room.connectedUsers = [...room?.connectedUsers||[], newUser];
+
   socket.join(roomId);
 
-  // add new user to connected users array
+
   connectedUsers = [...connectedUsers, newUser];
 
-  // emit to all users which are already in this room to prepare peer connection
+ 
   room.connectedUsers.forEach((user) => {
-    if (user.socketId !== socket.id) {
+    console.log("🚀 ~ user ~ user:", user)
+
+    if (user.socketId != socket.id) {
       const data = {
         connUserSocketId: socket.id,
       };
+      console.log("🚀 ~ user ~ connUserSocketId:","data",data)
 
       io.to(user.socketId).emit("conn-prepare", data);
     }
@@ -159,26 +170,25 @@ const joinRoomHandler = (data, socket) => {
 };
 
 const disconnectHandler = (socket) => {
-  // find if user has been registered - if yes remove him from room and connected users array
+
   const user = connectedUsers.find((user) => user.socketId === socket.id);
 
   if (user) {
-    // remove user from room in server
+  
     const room = rooms.find((room) => room.id === user.roomId);
 
     room.connectedUsers = room.connectedUsers.filter(
       (user) => user.socketId !== socket.id
     );
 
-    // leave socket io room
+    
     socket.leave(user.roomId);
 
-    // close the room if amount of the users which will stay in room will be 0
+    
     if (room.connectedUsers.length > 0) {
-      // emit to all users which are still in the room that user disconnected
+    
       io.to(room.id).emit("user-disconnected", { socketId: socket.id });
 
-      // emit an event to rest of the users which left in the toom new connectedUsers in room
       io.to(room.id).emit("room-update", {
         connectedUsers: room.connectedUsers,
       });
@@ -195,7 +205,7 @@ const signalingHandler = (data, socket) => {
   io.to(connUserSocketId).emit("conn-signal", signalingData);
 };
 
-// information from clients which are already in room that They have preapred for incoming connection
+
 const initializeConnectionHandler = (data, socket) => {
   const { connUserSocketId } = data;
 
